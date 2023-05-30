@@ -9,35 +9,36 @@ contract MultiSigWallet {
     event Deposit (address sender, uint _value);
 
 // Transaction is submited 
-    event Submit (address _to, uint _value);
+    event Submit (address _to, uint _value, uint txNonce);
 
-    // TODO: Sign event.
  // Signs a Transaction
-    event Sign (address indexed owner);
+    event Sign (address indexed _owner, uint _txNonce);
 
 // Transaction Executed 
-    event transactionExecuted (address indexed owner, uint indexed tx_Index);
+    event transactionExecuted (address indexed _owner, uint _txNonce);
 
 // Tracks a transaction 
     struct Transaction {
         address to;
         uint value;
         uint confirmations;
-        // TODO: Map of who signed!!!
         address signature;
-
+        
     }
+        // TODO: Map of who signed!!!
+        
     
 // Stores owners addresses 
-    address[] public owners;
+    address[] private owners;
     mapping(address => bool) public OwnersCheck;
 
 // Stores the required Signatures
     uint public requiredSignatures;
+    mapping (address => bool) isSigned;
 
-    // TODO: Change to mapping and create a global nonce to store the next tx index.
-    mapping(uint => Transaction) public nonce;
-    uint nonceNumber;
+ // Stores tx Index 
+    mapping (uint => Transaction) public txMap;
+    uint txNonce;
 
 // Checks if msg.sender is owner 
     modifier ownerOnly() {
@@ -47,7 +48,7 @@ contract MultiSigWallet {
 
 // Checks if transaction exists 
     modifier txExists(uint _txIndex) {
-        require(_txIndex < nonce.length, "Tx doesn't exist");
+        require(_txIndex <= txNonce, "Tx doesn't exist");
         _;
     }
 
@@ -73,24 +74,35 @@ contract MultiSigWallet {
 
 // Submits a transaction 
     function submit(address _to, uint _value) external ownerOnly {
-        nonceNumber += 1;
-        Transaction({
+
+        Transaction storage tx;
+        tx = Transaction({
             to: _to,
             value: _value,
-                // TODO: Should already have one signature.
             confirmations: 1,
             signature: msg.sender
-        })
+            
+        });
+    
 
-    ;}
+        txMap[txNonce] = tx;
+        txNonce;
+
+    }
     
     function signTransaction(uint _txIndex) public ownerOnly txExists(_txIndex){
+        _txIndex = txNonce;
+        
+        Transaction storage tx = txNonce;
         // TODO: Check if the same owner already signed!!!
-        require(! msg.sender.Submit);
-        Transaction storage transaction = Transaction[_txIndex];
-        transaction.confirmations += 1;
+        require(!tx.signature == msg.sender, "Owner already signed this tx");
+        tx.confirmations += 1;
     }
     
         // TODO: Execute function
+   function executeTransaction(uint _txIndex) public ownerOnly txExists(_txIndex) {
+        Transaction storage transaction = Transaction[_txIndex];
+        require(Transaction.confirmations >= requiredSignatures);
+   }
 
 }
