@@ -33,6 +33,8 @@ contract MultiSigWallet {
 
 // Stores the required Signatures
     uint public requiredSignatures;
+    mapping (address => bool) whoSigned;
+
 
  // Stores tx Index 
     mapping (uint => Transaction) public txMap;
@@ -82,6 +84,7 @@ contract MultiSigWallet {
     
         txMap[txNonce];
         txNonce;
+        whoSigned[msg.sender] = true;
 
     }
     
@@ -89,6 +92,7 @@ contract MultiSigWallet {
         _txIndex = txNonce;
         
         Transaction storage transaction = txMap[txNonce];
+        require(!whoSigned[msg.sender]);
         // TODO: Check if the same owner already signed!!!
         transaction.confirmations += 1;
     }
@@ -96,6 +100,9 @@ contract MultiSigWallet {
         // TODO: Execute function
    function executeTransaction(uint _txIndex) public ownerOnly txExists(_txIndex) {
         Transaction storage transaction = txMap[txNonce];
+        require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
+        (bool success, ) = transaction.to.call{value: transaction.value} ("");
+        require(success, "Tx failed to execute");
    }
 
 }

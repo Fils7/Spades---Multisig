@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/filipe/Code/Spades/contracts/Spades.sol": {
-      "lastModificationDate": 1685494603556,
-      "contentHash": "914437598649d0e769c98e4fea741e00",
+      "lastModificationDate": 1685529536674,
+      "contentHash": "eeb30eff4ffcfd8e3c4c82ea6fdd8629",
       "sourceName": "contracts/Spades.sol",
       "solcConfig": {
         "version": "0.8.0",
