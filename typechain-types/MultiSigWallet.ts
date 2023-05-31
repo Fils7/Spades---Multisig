@@ -30,23 +30,23 @@ import type {
 export interface MultiSigWalletInterface extends utils.Interface {
   functions: {
     "OwnersCheck(address)": FunctionFragment;
-    "owners(uint256)": FunctionFragment;
+    "executeTransaction(uint256)": FunctionFragment;
     "requiredSignatures()": FunctionFragment;
     "signTransaction(uint256)": FunctionFragment;
     "submit(address,uint256)": FunctionFragment;
-    "timeFrame()": FunctionFragment;
-    "transactions(uint256)": FunctionFragment;
+    "transaction()": FunctionFragment;
+    "txMap(uint256)": FunctionFragment;
   };
 
   getFunction(
     nameOrSignatureOrTopic:
       | "OwnersCheck"
-      | "owners"
+      | "executeTransaction"
       | "requiredSignatures"
       | "signTransaction"
       | "submit"
-      | "timeFrame"
-      | "transactions"
+      | "transaction"
+      | "txMap"
   ): FunctionFragment;
 
   encodeFunctionData(
@@ -54,7 +54,7 @@ export interface MultiSigWalletInterface extends utils.Interface {
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
-    functionFragment: "owners",
+    functionFragment: "executeTransaction",
     values: [PromiseOrValue<BigNumberish>]
   ): string;
   encodeFunctionData(
@@ -69,9 +69,12 @@ export interface MultiSigWalletInterface extends utils.Interface {
     functionFragment: "submit",
     values: [PromiseOrValue<string>, PromiseOrValue<BigNumberish>]
   ): string;
-  encodeFunctionData(functionFragment: "timeFrame", values?: undefined): string;
   encodeFunctionData(
-    functionFragment: "transactions",
+    functionFragment: "transaction",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "txMap",
     values: [PromiseOrValue<BigNumberish>]
   ): string;
 
@@ -79,7 +82,10 @@ export interface MultiSigWalletInterface extends utils.Interface {
     functionFragment: "OwnersCheck",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "owners", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "executeTransaction",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "requiredSignatures",
     data: BytesLike
@@ -89,46 +95,56 @@ export interface MultiSigWalletInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "submit", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "timeFrame", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "transactions",
+    functionFragment: "transaction",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "txMap", data: BytesLike): Result;
 
   events: {
     "Deposit(address,uint256)": EventFragment;
-    "Submit(address,uint256,bool)": EventFragment;
+    "Sign(address,uint256)": EventFragment;
+    "Submit(address,uint256,uint256)": EventFragment;
     "transactionExecuted(address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Deposit"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Sign"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Submit"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "transactionExecuted"): EventFragment;
 }
 
 export interface DepositEventObject {
   sender: string;
-  value: BigNumber;
+  _value: BigNumber;
 }
 export type DepositEvent = TypedEvent<[string, BigNumber], DepositEventObject>;
 
 export type DepositEventFilter = TypedEventFilter<DepositEvent>;
 
+export interface SignEventObject {
+  _owner: string;
+  _txNonce: BigNumber;
+}
+export type SignEvent = TypedEvent<[string, BigNumber], SignEventObject>;
+
+export type SignEventFilter = TypedEventFilter<SignEvent>;
+
 export interface SubmitEventObject {
   _to: string;
   _value: BigNumber;
-  executed: boolean;
+  txNonce: BigNumber;
 }
 export type SubmitEvent = TypedEvent<
-  [string, BigNumber, boolean],
+  [string, BigNumber, BigNumber],
   SubmitEventObject
 >;
 
 export type SubmitEventFilter = TypedEventFilter<SubmitEvent>;
 
 export interface transactionExecutedEventObject {
-  owner: string;
-  tx_Index: BigNumber;
+  _owner: string;
+  _txNonce: BigNumber;
 }
 export type transactionExecutedEvent = TypedEvent<
   [string, BigNumber],
@@ -170,10 +186,10 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[boolean]>;
 
-    owners(
-      arg0: PromiseOrValue<BigNumberish>,
-      overrides?: CallOverrides
-    ): Promise<[string]>;
+    executeTransaction(
+      _txIndex: PromiseOrValue<BigNumberish>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
 
     requiredSignatures(overrides?: CallOverrides): Promise<[BigNumber]>;
 
@@ -188,17 +204,26 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
-    timeFrame(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    transactions(
-      arg0: PromiseOrValue<BigNumberish>,
+    transaction(
       overrides?: CallOverrides
     ): Promise<
-      [string, BigNumber, BigNumber, boolean] & {
+      [string, BigNumber, BigNumber, string] & {
         to: string;
         value: BigNumber;
         confirmations: BigNumber;
-        executed: boolean;
+        signature: string;
+      }
+    >;
+
+    txMap(
+      arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<
+      [string, BigNumber, BigNumber, string] & {
+        to: string;
+        value: BigNumber;
+        confirmations: BigNumber;
+        signature: string;
       }
     >;
   };
@@ -208,10 +233,10 @@ export interface MultiSigWallet extends BaseContract {
     overrides?: CallOverrides
   ): Promise<boolean>;
 
-  owners(
-    arg0: PromiseOrValue<BigNumberish>,
-    overrides?: CallOverrides
-  ): Promise<string>;
+  executeTransaction(
+    _txIndex: PromiseOrValue<BigNumberish>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
 
   requiredSignatures(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -226,17 +251,26 @@ export interface MultiSigWallet extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
-  timeFrame(overrides?: CallOverrides): Promise<BigNumber>;
-
-  transactions(
-    arg0: PromiseOrValue<BigNumberish>,
+  transaction(
     overrides?: CallOverrides
   ): Promise<
-    [string, BigNumber, BigNumber, boolean] & {
+    [string, BigNumber, BigNumber, string] & {
       to: string;
       value: BigNumber;
       confirmations: BigNumber;
-      executed: boolean;
+      signature: string;
+    }
+  >;
+
+  txMap(
+    arg0: PromiseOrValue<BigNumberish>,
+    overrides?: CallOverrides
+  ): Promise<
+    [string, BigNumber, BigNumber, string] & {
+      to: string;
+      value: BigNumber;
+      confirmations: BigNumber;
+      signature: string;
     }
   >;
 
@@ -246,10 +280,10 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
-    owners(
-      arg0: PromiseOrValue<BigNumberish>,
+    executeTransaction(
+      _txIndex: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
-    ): Promise<string>;
+    ): Promise<void>;
 
     requiredSignatures(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -264,39 +298,60 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    timeFrame(overrides?: CallOverrides): Promise<BigNumber>;
-
-    transactions(
-      arg0: PromiseOrValue<BigNumberish>,
+    transaction(
       overrides?: CallOverrides
     ): Promise<
-      [string, BigNumber, BigNumber, boolean] & {
+      [string, BigNumber, BigNumber, string] & {
         to: string;
         value: BigNumber;
         confirmations: BigNumber;
-        executed: boolean;
+        signature: string;
+      }
+    >;
+
+    txMap(
+      arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<
+      [string, BigNumber, BigNumber, string] & {
+        to: string;
+        value: BigNumber;
+        confirmations: BigNumber;
+        signature: string;
       }
     >;
   };
 
   filters: {
-    "Deposit(address,uint256)"(sender?: null, value?: null): DepositEventFilter;
-    Deposit(sender?: null, value?: null): DepositEventFilter;
+    "Deposit(address,uint256)"(
+      sender?: null,
+      _value?: null
+    ): DepositEventFilter;
+    Deposit(sender?: null, _value?: null): DepositEventFilter;
 
-    "Submit(address,uint256,bool)"(
+    "Sign(address,uint256)"(
+      _owner?: PromiseOrValue<string> | null,
+      _txNonce?: null
+    ): SignEventFilter;
+    Sign(
+      _owner?: PromiseOrValue<string> | null,
+      _txNonce?: null
+    ): SignEventFilter;
+
+    "Submit(address,uint256,uint256)"(
       _to?: null,
       _value?: null,
-      executed?: null
+      txNonce?: null
     ): SubmitEventFilter;
-    Submit(_to?: null, _value?: null, executed?: null): SubmitEventFilter;
+    Submit(_to?: null, _value?: null, txNonce?: null): SubmitEventFilter;
 
     "transactionExecuted(address,uint256)"(
-      owner?: PromiseOrValue<string> | null,
-      tx_Index?: PromiseOrValue<BigNumberish> | null
+      _owner?: PromiseOrValue<string> | null,
+      _txNonce?: null
     ): transactionExecutedEventFilter;
     transactionExecuted(
-      owner?: PromiseOrValue<string> | null,
-      tx_Index?: PromiseOrValue<BigNumberish> | null
+      _owner?: PromiseOrValue<string> | null,
+      _txNonce?: null
     ): transactionExecutedEventFilter;
   };
 
@@ -306,9 +361,9 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    owners(
-      arg0: PromiseOrValue<BigNumberish>,
-      overrides?: CallOverrides
+    executeTransaction(
+      _txIndex: PromiseOrValue<BigNumberish>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
     requiredSignatures(overrides?: CallOverrides): Promise<BigNumber>;
@@ -324,9 +379,9 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
-    timeFrame(overrides?: CallOverrides): Promise<BigNumber>;
+    transaction(overrides?: CallOverrides): Promise<BigNumber>;
 
-    transactions(
+    txMap(
       arg0: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
@@ -338,9 +393,9 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    owners(
-      arg0: PromiseOrValue<BigNumberish>,
-      overrides?: CallOverrides
+    executeTransaction(
+      _txIndex: PromiseOrValue<BigNumberish>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
     requiredSignatures(
@@ -358,9 +413,9 @@ export interface MultiSigWallet extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
-    timeFrame(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    transaction(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
-    transactions(
+    txMap(
       arg0: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;

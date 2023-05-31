@@ -23,10 +23,9 @@ contract MultiSigWallet {
         uint value;
         uint confirmations;
         address signature;
-        
     }
-        // TODO: Map of who signed!!!
-        
+
+    Transaction public transaction;
     
 // Stores owners addresses 
     address[] private owners;
@@ -34,7 +33,6 @@ contract MultiSigWallet {
 
 // Stores the required Signatures
     uint public requiredSignatures;
-    mapping (address => bool) isSigned;
 
  // Stores tx Index 
     mapping (uint => Transaction) public txMap;
@@ -75,17 +73,14 @@ contract MultiSigWallet {
 // Submits a transaction 
     function submit(address _to, uint _value) external ownerOnly {
 
-        Transaction storage tx;
-        tx = Transaction({
+        transaction = Transaction({
             to: _to,
             value: _value,
             confirmations: 1,
             signature: msg.sender
-            
         });
     
-
-        txMap[txNonce] = tx;
+        txMap[txNonce];
         txNonce;
 
     }
@@ -93,16 +88,14 @@ contract MultiSigWallet {
     function signTransaction(uint _txIndex) public ownerOnly txExists(_txIndex){
         _txIndex = txNonce;
         
-        Transaction storage tx = txNonce;
+        Transaction storage transaction = txMap[txNonce];
         // TODO: Check if the same owner already signed!!!
-        require(!tx.signature == msg.sender, "Owner already signed this tx");
-        tx.confirmations += 1;
+        transaction.confirmations += 1;
     }
     
         // TODO: Execute function
    function executeTransaction(uint _txIndex) public ownerOnly txExists(_txIndex) {
-        Transaction storage transaction = Transaction[_txIndex];
-        require(Transaction.confirmations >= requiredSignatures);
+        Transaction storage transaction = txMap[txNonce];
    }
 
 }
