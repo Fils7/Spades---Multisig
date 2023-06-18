@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/filipe/Code/Spades/contracts/Spades.sol": {
-      "lastModificationDate": 1685529536674,
-      "contentHash": "eeb30eff4ffcfd8e3c4c82ea6fdd8629",
+      "lastModificationDate": 1687051577884,
+      "contentHash": "26f7b09427ece28558dd0b8a02fab213",
       "sourceName": "contracts/Spades.sol",
       "solcConfig": {
         "version": "0.8.0",
@@ -35,11 +35,11 @@
         "0.8.0"
       ],
       "artifacts": [
-        "MultiSigWallet"
+        "Spades"
       ]
     },
     "/home/filipe/Code/Spades/node_modules/hardhat/console.sol": {
-      "lastModificationDate": 1684458611425,
+      "lastModificationDate": 1687042868253,
       "contentHash": "4ff3cd2f6272c9a6516e9ee4f2b967d3",
       "sourceName": "hardhat/console.sol",
       "solcConfig": {

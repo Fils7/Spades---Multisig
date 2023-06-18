@@ -3,7 +3,7 @@ pragma solidity 0.8.0;
 
 import "hardhat/console.sol";
 
-contract MultiSigWallet {
+contract Spades {
     
 // Emits a Deposit 
     event Deposit (address sender, uint _value);
@@ -33,8 +33,7 @@ contract MultiSigWallet {
 
 // Stores the required Signatures
     uint public requiredSignatures;
-    mapping (address => bool) whoSigned;
-
+    mapping(address => bool) whoSigned;
 
  // Stores tx Index 
     mapping (uint => Transaction) public txMap;
@@ -53,7 +52,7 @@ contract MultiSigWallet {
     }
 
 // Sets the number of owners and signatures needed 
-    constructor(address[] memory _owners, uint _signaturesRequired) {
+    constructor(address[] memory _owners, uint _signaturesRequired) payable {
         require(_owners.length > 0, "Not enough owners");
         require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, "Invalid, due to number of owners");
 
@@ -82,27 +81,25 @@ contract MultiSigWallet {
             signature: msg.sender
         });
     
-        txMap[txNonce];
-        txNonce;
+        txMap[txNonce] = transaction;
+        txNonce++;
         whoSigned[msg.sender] = true;
 
     }
     
-    function signTransaction(uint _txIndex) public ownerOnly txExists(_txIndex){
-        _txIndex = txNonce;
-        
-        Transaction storage transaction = txMap[txNonce];
+    function signTransaction(uint txIndex) public ownerOnly txExists(txIndex){
+        Transaction storage transaction = txMap[txIndex];
         require(!whoSigned[msg.sender]);
-        // TODO: Check if the same owner already signed!!!
         transaction.confirmations += 1;
     }
     
-        // TODO: Execute function
-   function executeTransaction(uint _txIndex) public ownerOnly txExists(_txIndex) {
-        Transaction storage transaction = txMap[txNonce];
+   function executeTransaction(uint txIndex) public ownerOnly txExists(txIndex) {
+        Transaction storage transaction = txMap[txIndex];
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
         (bool success, ) = transaction.to.call{value: transaction.value} ("");
         require(success, "Tx failed to execute");
    }
+
+   
 
 }

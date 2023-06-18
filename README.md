@@ -1,5 +1,13 @@
-This paper introduces **Spades**: an open source multisig wallet contract.
+# Sample Hardhat Project
 
- **Spades** is a smart contract, that uses multisignature as its core feature. Users that deploy this contract, can choose how many owners/signatures will be required.
+This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
 
+Try running some of the following tasks:
 
+```shell
+npx hardhat help
+npx hardhat test
+REPORT_GAS=true npx hardhat test
+npx hardhat node
+npx hardhat run scripts/deploy.js
+```
