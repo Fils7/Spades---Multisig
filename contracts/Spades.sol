@@ -33,7 +33,7 @@ contract Spades {
 
 // Stores the required Signatures
     uint public requiredSignatures;
-    mapping(address => bool) whoSigned;
+    mapping (uint => mapping (address => bool)) whoSigned;
 
  // Stores tx Index 
     mapping (uint => Transaction) public txMap;
@@ -72,7 +72,7 @@ contract Spades {
     }
 
 // Submits a transaction 
-    function submit(address _to, uint _value) external ownerOnly {
+    function submit(address _to, uint _value) external payable ownerOnly {
 
         transaction = Transaction({
             to: _to,
@@ -83,23 +83,23 @@ contract Spades {
     
         txMap[txNonce] = transaction;
         txNonce++;
-        whoSigned[msg.sender] = true;
+        whoSigned[txNonce][msg.sender] = true;
+        emit Submit(msg.sender, msg.value, txNonce);
 
     }
     
     function signTransaction(uint txIndex) public ownerOnly txExists(txIndex){
         Transaction storage transaction = txMap[txIndex];
-        require(!whoSigned[msg.sender]);
+        require(!whoSigned[txNonce][msg.sender]);
         transaction.confirmations += 1;
+        emit Sign (msg.sender, txNonce);
     }
     
-   function executeTransaction(uint txIndex) public ownerOnly txExists(txIndex) {
+   function executeTransaction(uint txIndex) public txExists(txIndex) {
         Transaction storage transaction = txMap[txIndex];
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
         (bool success, ) = transaction.to.call{value: transaction.value} ("");
         require(success, "Tx failed to execute");
+        emit transactionExecuted (msg.sender, txNonce);
    }
-
-   
-
 }
