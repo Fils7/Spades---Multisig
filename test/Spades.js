@@ -18,6 +18,7 @@ describe("Spades", function () {
   }
 
   describe("Submit", function () {
+
     it("Should submit a transaction to be signed", async function () {
       const { wallet, owner3} = await loadFixture(deploySpadesFixture);
       await wallet.submit(owner3.address, 100);
@@ -30,18 +31,34 @@ describe("Spades", function () {
         "Not owner"
       );
 
-
   describe("Sign", async function () {
-    it("Should be only owner to sign", async function () {
-      const { wallet, defaultAccount } = await loadFixture(deploySpadesFixture);
 
-      await expect(wallet.connect(defaultAccount).signTransaction(1)).to.be.revertedWith(
+    it("Should be only owner to sign", async function () {
+      const { wallet, defaultAccount, owner3 } = await loadFixture(deploySpadesFixture);
+      await wallet.submit(owner3.address, 100);
+
+      await expect(wallet.connect(defaultAccount).signTransaction(0)).to.be.revertedWith(
         "Not owner"
       );
+        
+      await expect(wallet.signTransaction(0));
+
+  describe("Execute", async function () {
+    it("Should execute the signed transaction", async function () {
+      const { wallet, owner3, owner2 } = await loadFixture(deploySpadesFixture);
+      await wallet.submit(owner3.address, 100);
+
+      await wallet.connect(owner2).signTransaction(0);
+      await wallet.connect(owner3).signTransaction(0);
+
+      await expect(wallet.executeTransaction(0)).to.changeEtherBalances(
+        [owner3, wallet],
+        [100, -100]
+      );
+    })
+  })
     });
   })
-
-  
   
     });
   });
