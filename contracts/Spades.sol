@@ -9,18 +9,18 @@ contract Spades {
     event Deposit (address sender, uint _value);
 
 // Transaction is submited 
-    event Submit (address _to, uint _value, uint txNonce);
+    event Submit (address _to, uint _amount);
 
  // Signs a Transaction
-    event Sign (address indexed _owner, uint _txNonce);
+    event Sign (address _owner, uint _txNonce);
 
 // Transaction Executed 
-    event transactionExecuted (address indexed _owner, uint _txNonce);
+    event transactionExecuted (address sender, uint _txNonce);
 
 // Tracks a transaction 
     struct Transaction {
         address to;
-        uint value;
+        uint amount;
         uint confirmations;
         address signature;
     }
@@ -72,11 +72,11 @@ contract Spades {
     }
 
 // Submits a transaction 
-    function submit(address _to, uint _value) external payable ownerOnly {
+    function submit(address _to, uint _amount) external payable ownerOnly {
 
         transaction = Transaction({
             to: _to,
-            value: _value,
+            amount: _amount,
             confirmations: 1,
             signature: msg.sender
         });
@@ -84,7 +84,7 @@ contract Spades {
         txMap[txNonce] = transaction;
         txNonce++;
         whoSigned[txNonce][msg.sender] = true;
-        emit Submit(msg.sender, msg.value, txNonce);
+        emit Submit(msg.sender, _amount);
 
     }
     
@@ -92,13 +92,13 @@ contract Spades {
         Transaction storage transaction = txMap[txIndex];
         require(!whoSigned[txNonce][msg.sender]);
         transaction.confirmations += 1;
-        emit Sign (msg.sender, txNonce);
+        emit Sign (msg.sender, txIndex);
     }
     
    function executeTransaction(uint txIndex) public txExists(txIndex) {
         Transaction storage transaction = txMap[txIndex];
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
-        (bool success, ) = transaction.to.call{value: transaction.value} ("");
+        (bool success, ) = transaction.to.call{value: transaction.amount} ("");
         require(success, "Tx failed to execute");
         emit transactionExecuted (msg.sender, txNonce);
    }
