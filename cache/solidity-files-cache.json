@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/filipe/Code/Spades/contracts/Spades.sol": {
-      "lastModificationDate": 1687915053871,
-      "contentHash": "2c8075d289406a96ee10b5da34ed1b00",
+      "lastModificationDate": 1688477281178,
+      "contentHash": "12af8d0913b88eb776696f18ef1d2b51",
       "sourceName": "contracts/Spades.sol",
       "solcConfig": {
         "version": "0.8.0",
@@ -39,8 +39,8 @@
       ]
     },
     "/home/filipe/Code/Spades/node_modules/hardhat/console.sol": {
-      "lastModificationDate": 1687042868253,
-      "contentHash": "4ff3cd2f6272c9a6516e9ee4f2b967d3",
+      "lastModificationDate": 1688127887033,
+      "contentHash": "e2884fb4e1ef4b4a7c7ac3a227880b0f",
       "sourceName": "hardhat/console.sol",
       "solcConfig": {
         "version": "0.8.0",

@@ -9,7 +9,7 @@ contract Spades {
     event Deposit (address sender, uint _value);
 
 // Transaction is submited 
-    event Submit (address _to, uint _amount);
+    event Submit (address _to, uint _amount, uint _txNonce);
 
  // Signs a Transaction
     event Sign (address _owner, uint _txNonce);
@@ -31,8 +31,11 @@ contract Spades {
     address[] private owners;
     mapping(address => bool) public OwnersCheck;
 
-// Stores the required Signatures
+// Stores the required Signatures passed in the constructor()
     uint public requiredSignatures;
+
+// Goes from an uint (TxIndex) to the address (Owner) that signed
+// and equals true if that owner already signed that specific tx;
     mapping (uint => mapping (address => bool)) whoSigned;
 
  // Stores tx Index 
@@ -54,7 +57,7 @@ contract Spades {
 // Sets the number of owners and signatures needed 
     constructor(address[] memory _owners, uint _signaturesRequired) payable {
         require(_owners.length > 0, "Not enough owners");
-        require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, "Invalid, due to number of owners");
+        require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, "Signatures required must be greater than 0 and less than the owners defined ");
 
        for (uint i; i < _owners.length; i ++) {
         address owner = _owners[i];
@@ -82,16 +85,37 @@ contract Spades {
         });
     
         txMap[txNonce] = transaction;
-        txNonce++;
+        txNonce ++;
         whoSigned[txNonce][msg.sender] = true;
-        emit Submit(msg.sender, _amount);
+
+        emit Submit(msg.sender, _amount, txNonce -1);
 
     }
+    
+    function getTransaction(uint txIndex) public view returns (address to, uint amount, uint confirmations, address signature) {
+    
+        Transaction storage transaction = txMap[txIndex];
+
+        return (
+            transaction.to,
+            transaction.amount,
+            transaction.confirmations,
+            transaction.signature
+        );
+    }
+    
+
+    function seeIfSigned(uint _txNonce, address _owner) public view returns (bool) {
+        _txNonce = txNonce;
+        return whoSigned[txNonce][_owner];
+    }
+
     
     function signTransaction(uint txIndex) public ownerOnly txExists(txIndex){
         Transaction storage transaction = txMap[txIndex];
         require(!whoSigned[txNonce][msg.sender]);
         transaction.confirmations += 1;
+        
         emit Sign (msg.sender, txIndex);
     }
     
@@ -100,6 +124,7 @@ contract Spades {
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
         (bool success, ) = transaction.to.call{value: transaction.amount} ("");
         require(success, "Tx failed to execute");
-        emit transactionExecuted (msg.sender, txNonce);
+
+        emit transactionExecuted (msg.sender, txNonce -1);
    }
 }
