@@ -6,10 +6,10 @@ import "hardhat/console.sol";
 contract Spades {
     
 // Emits a Deposit 
-    event Deposit (address sender, uint _value);
+    event Deposit (address sender, uint _value, uint _balance);
 
 // Transaction is submited 
-    event Submit (address _to, uint _amount, uint _txNonce);
+    event Submit (address _to, uint _amount, uint _txNonce, bytes data);
 
  // Signs a Transaction
     event Sign (address _owner, uint _txNonce);
@@ -23,6 +23,7 @@ contract Spades {
         uint amount;
         uint confirmations;
         address signature;
+        bytes data;
     }
 
     Transaction public transaction;
@@ -71,24 +72,25 @@ contract Spades {
     
 // Receive Ether 
     receive() external payable {
-        emit Deposit (msg.sender, msg.value);
+        emit Deposit (msg.sender, msg.value, address(this).balance);
     }
 
 // Submits a transaction 
-    function submit(address _to, uint _amount) external payable ownerOnly {
+    function submit(address _to, uint _amount, bytes memory _data) external payable ownerOnly {
 
         transaction = Transaction({
             to: _to,
             amount: _amount,
             confirmations: 1,
-            signature: msg.sender
+            signature: msg.sender,
+            data: _data
         });
     
         txMap[txNonce] = transaction;
         txNonce ++;
         whoSigned[txNonce][msg.sender] = true;
 
-        emit Submit(msg.sender, _amount, txNonce -1);
+        emit Submit(msg.sender, _amount, txNonce -1, _data);
 
     }
     
@@ -103,7 +105,6 @@ contract Spades {
             transaction.signature
         );
     }
-    
 
     function seeIfSigned(uint _txNonce, address _owner) public view returns (bool) {
         _txNonce = txNonce;
@@ -122,9 +123,12 @@ contract Spades {
    function executeTransaction(uint txIndex) public txExists(txIndex) {
         Transaction storage transaction = txMap[txIndex];
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
-        (bool success, ) = transaction.to.call{value: transaction.amount} ("");
+        (bool success, ) = transaction.to.call{value: transaction.amount}(
+            transaction.data);
         require(success, "Tx failed to execute");
 
         emit transactionExecuted (msg.sender, txNonce -1);
    }
+
+
 }

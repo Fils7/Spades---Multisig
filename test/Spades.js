@@ -31,7 +31,7 @@ describe("Spades", function () {
     it("Should revert if you're not the owner", async function () {
       const { wallet, owner3, testAccount } = await loadFixture(deploySpadesFixture);
 
-      await expect(wallet.connect(testAccount).submit(owner3.address, 50)).to.be.revertedWith(
+      await expect(wallet.connect(testAccount).submit(owner3.address, 50, 575768)).to.be.revertedWith(
         "Not owner"
       );
 
