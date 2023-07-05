@@ -6,23 +6,24 @@ import "hardhat/console.sol";
 contract Spades {
     
 // Emits a Deposit 
-    event Deposit (address sender, uint _value);
+    event Deposit (address sender, uint _value, uint _balance);
 
 // Transaction is submited 
-    event Submit (address _to, uint _value, uint txNonce);
+    event Submit (address _to, uint _amount, uint _txNonce, bytes data);
 
  // Signs a Transaction
-    event Sign (address indexed _owner, uint _txNonce);
+    event Sign (address _owner, uint _txNonce);
 
 // Transaction Executed 
-    event transactionExecuted (address indexed _owner, uint _txNonce);
+    event transactionExecuted (address sender, uint _txNonce);
 
 // Tracks a transaction 
     struct Transaction {
         address to;
-        uint value;
+        uint amount;
         uint confirmations;
         address signature;
+        bytes data;
     }
 
     Transaction public transaction;
@@ -31,8 +32,11 @@ contract Spades {
     address[] private owners;
     mapping(address => bool) public OwnersCheck;
 
-// Stores the required Signatures
+// Stores the required Signatures passed in the constructor()
     uint public requiredSignatures;
+
+// Goes from an uint (TxIndex) to the address (Owner) that signed
+// and equals true if that owner already signed that specific tx;
     mapping (uint => mapping (address => bool)) whoSigned;
 
  // Stores tx Index 
@@ -54,7 +58,7 @@ contract Spades {
 // Sets the number of owners and signatures needed 
     constructor(address[] memory _owners, uint _signaturesRequired) payable {
         require(_owners.length > 0, "Not enough owners");
-        require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, "Invalid, due to number of owners");
+        require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, "Signatures required must be greater than 0 and less than the owners defined ");
 
        for (uint i; i < _owners.length; i ++) {
         address owner = _owners[i];
@@ -68,38 +72,63 @@ contract Spades {
     
 // Receive Ether 
     receive() external payable {
-        emit Deposit (msg.sender, msg.value);
+        emit Deposit (msg.sender, msg.value, address(this).balance);
     }
 
 // Submits a transaction 
-    function submit(address _to, uint _value) external payable ownerOnly {
+    function submit(address _to, uint _amount, bytes memory _data) external payable ownerOnly {
 
         transaction = Transaction({
             to: _to,
-            value: _value,
+            amount: _amount,
             confirmations: 1,
-            signature: msg.sender
+            signature: msg.sender,
+            data: _data
         });
     
         txMap[txNonce] = transaction;
-        txNonce++;
+        txNonce ++;
         whoSigned[txNonce][msg.sender] = true;
-        emit Submit(msg.sender, msg.value, txNonce);
+
+        emit Submit(msg.sender, _amount, txNonce -1, _data);
 
     }
+    
+    function getTransaction(uint txIndex) public view returns (address to, uint amount, uint confirmations, address signature) {
+    
+        Transaction storage transaction = txMap[txIndex];
+
+        return (
+            transaction.to,
+            transaction.amount,
+            transaction.confirmations,
+            transaction.signature
+        );
+    }
+
+    function seeIfSigned(uint _txNonce, address _owner) public view returns (bool) {
+        _txNonce = txNonce;
+        return whoSigned[txNonce][_owner];
+    }
+
     
     function signTransaction(uint txIndex) public ownerOnly txExists(txIndex){
         Transaction storage transaction = txMap[txIndex];
         require(!whoSigned[txNonce][msg.sender]);
         transaction.confirmations += 1;
-        emit Sign (msg.sender, txNonce);
+        
+        emit Sign (msg.sender, txIndex);
     }
     
    function executeTransaction(uint txIndex) public txExists(txIndex) {
         Transaction storage transaction = txMap[txIndex];
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
-        (bool success, ) = transaction.to.call{value: transaction.value} ("");
+        (bool success, ) = transaction.to.call{value: transaction.amount}(
+            transaction.data);
         require(success, "Tx failed to execute");
-        emit transactionExecuted (msg.sender, txNonce);
+
+        emit transactionExecuted (msg.sender, txNonce -1);
    }
+
+
 }
