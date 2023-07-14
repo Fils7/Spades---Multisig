@@ -17,6 +17,9 @@ contract Spades {
 // Transaction Executed 
     event transactionExecuted (address sender, uint _txNonce);
 
+// Transaction was revoked
+    event revoked (address sender, uint _txNonce);
+
 // Tracks a transaction 
     struct Transaction {
         address to;
@@ -24,6 +27,7 @@ contract Spades {
         uint confirmations;
         address signature;
         bytes data;
+        bool executed;
     }
 
     Transaction public transaction;
@@ -51,7 +55,13 @@ contract Spades {
 
 // Checks if transaction exists 
     modifier txExists(uint _txIndex) {
-        require(_txIndex <= txNonce, "Tx doesn't exist");
+        require(_txIndex < txNonce, "Tx doesn't exist");
+        _;
+    }
+
+// Checks if the tx was not executed
+    modifier notExecuted(uint _txIndex) {
+        require(txMap[_txIndex].executed == false, "Transaction was already executed");
         _;
     }
 
@@ -83,7 +93,8 @@ contract Spades {
             amount: _amount,
             confirmations: 1,
             signature: msg.sender,
-            data: _data
+            data: _data,
+            executed: false
         });
     
         txMap[txNonce] = transaction;
@@ -94,6 +105,7 @@ contract Spades {
 
     }
     
+// Returns a transaction when given the tx_index
     function getTransaction(uint txIndex) public view returns (address to, uint amount, uint confirmations, address signature) {
     
         Transaction storage transaction = txMap[txIndex];
@@ -106,29 +118,42 @@ contract Spades {
         );
     }
 
-    function seeIfSigned(uint _txNonce, address _owner) public view returns (bool) {
-        _txNonce = txNonce;
-        return whoSigned[txNonce][_owner];
+// Can check who already signed the transaction
+    function seeIfSigned(uint txIndex, address _owner) public view returns (bool) {
+        return whoSigned[txIndex][_owner];
     }
 
-    
+// Signs a transaction that was submited from another owner
     function signTransaction(uint txIndex) public ownerOnly txExists(txIndex){
         Transaction storage transaction = txMap[txIndex];
-        require(!whoSigned[txNonce][msg.sender]);
+        require(whoSigned[txIndex][msg.sender] == false);
         transaction.confirmations += 1;
+        whoSigned[txIndex][msg.sender] = true;
         
         emit Sign (msg.sender, txIndex);
     }
+
+// Revokes a signature that was already made
+    function revokeConfirmation(uint txIndex) public txExists(txIndex) notExecuted(txIndex) ownerOnly {
+        Transaction storage transaction = txMap[txIndex];
+
+        require(whoSigned[txIndex][msg.sender] == true, "You didn't sign this transaction");
+        transaction.confirmations -= 1;
+
+        emit revoked (msg.sender, txIndex);
+
+    }
     
+// Executes the transaction after reaching the required signatures
    function executeTransaction(uint txIndex) public txExists(txIndex) {
         Transaction storage transaction = txMap[txIndex];
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
         (bool success, ) = transaction.to.call{value: transaction.amount}(
             transaction.data);
         require(success, "Tx failed to execute");
+        txMap[txIndex].executed = true;
 
-        emit transactionExecuted (msg.sender, txNonce -1);
+        emit transactionExecuted (msg.sender, txIndex);
    }
-
 
 }
