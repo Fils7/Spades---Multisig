@@ -3,24 +3,27 @@ pragma solidity 0.8.0;
 
 import "hardhat/console.sol";
 
+/// @title A multisignature wallet
+/// @author Filipe Rey
 contract Spades {
-    
-// Emits a Deposit 
+
+    // Emits a Deposit 
     event Deposit (address sender, uint _value, uint _balance);
 
-// Transaction is submited 
+    // Transaction is submited 
     event Submit (address _to, uint _amount, uint _txNonce, bytes data);
 
- // Signs a Transaction
+    // Signs a Transaction
     event Sign (address _owner, uint _txNonce);
 
-// Transaction Executed 
+    // Transaction Executed 
     event transactionExecuted (address sender, uint _txNonce);
 
-// Transaction was revoked
+    // Transaction was revoked
     event revoked (address sender, uint _txNonce);
 
-// Tracks a transaction 
+    ///@notice This is what's inside a transaction
+    ///@dev returns data when interacting with other contracts
     struct Transaction {
         address to;
         uint amount;
