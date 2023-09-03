@@ -1,13 +1,15 @@
 import styles from "./instructionsComponent.module.css";
 import { useAccount, useBalance, useNetwork, useSignMessage } from "wagmi";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { parseEther } from "viem";
+import { bscTestnet } from "viem/chains";
 
 export default function InstructionsComponent() {
   return (
     <div className={styles.container}>
       <header className={styles.header_container}>
         <div className={styles.header}>
-          <h1>Welcome to Spades Multisig</h1>
+          <h1>SPADES</h1>
         </div>
       </header>
       <p className={styles.get_started}>
@@ -34,7 +36,7 @@ function WalletInfo() {
         <p> Your account address is {address}. </p>
         <p>Connected to the network {chain?.name}.</p>
         <WalletAction></WalletAction>
-        <WalletBalance address= {address}> </WalletBalance>
+        <WalletBalance address = {address}> </WalletBalance>
       </div>
     );
   if (isConnecting)
