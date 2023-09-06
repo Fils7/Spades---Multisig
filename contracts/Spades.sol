@@ -92,7 +92,7 @@ contract Spades {
     }
 
         // Submits a transaction 
-    function submit(address _to, uint _amount, bytes memory _data) external payable ownerOnly {
+    function submit(address _to, uint _amount, bytes memory _data) public ownerOnly {
 
         transaction = Transaction({
             to: _to,
@@ -104,8 +104,8 @@ contract Spades {
         });
     
         txMap[txNonce] = transaction;
-        txNonce ++;
         whoSigned[txNonce][msg.sender] = true;
+        txNonce ++;
 
         emit Submit(msg.sender, _amount, txNonce -1, _data);
 
