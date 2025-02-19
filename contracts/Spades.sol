@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity 0.8.28;
+
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "hardhat/console.sol";
 
 /**
  * @title  Spades Multisig
- * @author  Filipe Reys
+ * @author  Reey
  *
  * @notice  This is a multisignature wallet that permits several owners
  *  to submit and sign on transactions, for an extra layer of security.
@@ -13,7 +19,13 @@ import "hardhat/console.sol";
  * the rest of the owners, if all agree.
 */
 
-contract Spades {       
+contract Spades is 
+    Initializable, 
+    ReentrancyGuardUpgradeable, 
+    Ownable2StepUpgradeable, 
+    PausableUpgradeable, 
+    UUPSUpgradeable 
+{
 
                         //////////////// EVENTS ///////////////////
                     //////////////////////////////////////////////////
@@ -82,7 +94,7 @@ contract Spades {
     }
 
                         //////////////// Modifiers  ///////////////////
-                    ///////////////////////////////////////////////////////////
+                        ///////////////////////////////////////////////////////////
                         ///////////////////////////////////////////////////
                         
 
@@ -106,19 +118,24 @@ contract Spades {
     ///@dev Input of owners need to be more than zero. 
     // Signatures required need to be more than zero and less or equal to number of owners passed.
 
-    constructor (address[] memory _owners, uint _signaturesRequired) payable {
+    function initialize(address[] memory _owners, uint _signaturesRequired) public initializer {
+        __ReentrancyGuard_init();
+        __Ownable2Step_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
 
         require(_owners.length > 0, "Not enough owners");
-        require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, "Signatures required must be greater than 0 and less than the owners defined ");
+        require(_signaturesRequired > 0 && _signaturesRequired <= _owners.length, 
+            "Invalid signatures required");
 
-       for (uint i; i < _owners.length; i ++) {
-        address owner = _owners[i];
-        require(! OwnersCheck[owner], "Owner not unique");
-        OwnersCheck[owner] = true;
-        owners.push(owner);
-       }
+        for (uint i; i < _owners.length; i++) {
+            address owner = _owners[i];
+            require(!OwnersCheck[owner], "Owner not unique");
+            OwnersCheck[owner] = true;
+            owners.push(owner);
+        }
 
-       requiredSignatures = _signaturesRequired;
+        requiredSignatures = _signaturesRequired;
     }
     
     /// Contract can receive Ether. 
@@ -173,7 +190,7 @@ contract Spades {
     
     //// @notice Executes the transaction passed in submit function after reaching the required signatures;
 
-   function executeTransaction(uint txIndex) public txExists(txIndex) {
+   function executeTransaction(uint txIndex) public nonReentrant txExists(txIndex) {
         Transaction memory transaction = txMap[txIndex];
 
         require(transaction.confirmations >= requiredSignatures, "Not enough signatures");
@@ -193,7 +210,7 @@ contract Spades {
    function submitAccountLimit(address _account, uint _dailyWithdrawlimit) public ownerOnly {
 
         require(_dailyWithdrawlimit >= 0, "Invalid dailyWithdrawlimit");
-        require(OwnersCheck[_account] = true, "Address does not match with any of the owners.");
+        require(OwnersCheck[_account] == true, "Address does not match with any of the owners.");
 
         ProposedSettings memory proposedSettings  = ProposedSettings ({
 
@@ -221,7 +238,7 @@ contract Spades {
         require(whoSignedProposedSettings[_proposedSettingsIndex][msg.sender] == false, "Owner already signed this settings");
         ProposedSettings memory proposedSettings = submitedSettingsMap[_proposedSettingsIndex];
         proposedSettings.confirmations += 1;
-        whoSignedProposedSettings[_proposedSettingsIndex][msg.sender] == true;
+        whoSignedProposedSettings[_proposedSettingsIndex][msg.sender] = true;
 
         if (proposedSettings.confirmations >= requiredSignatures) {
 
@@ -236,7 +253,7 @@ contract Spades {
 
    ///@notice Can make a withdraw if the amount is lesser or equal to the account daily withdraw limit.
 
-    function withdraw(uint amount) public ownerOnly {
+    function withdraw(uint amount) public nonReentrant ownerOnly {
 
         Settings memory settingsDefined = accountSettings[msg.sender];
         require(amount <= accountSettings[msg.sender].withdrawLimit, "Exceeded withdraw limit");
@@ -273,5 +290,7 @@ contract Spades {
         return whoSignedTx[txIndex][_owner];
     }
 
+    // Required by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
     

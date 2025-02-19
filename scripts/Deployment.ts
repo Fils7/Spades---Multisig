@@ -1,119 +1,90 @@
-
 import { ethers } from "hardhat";
-import { Spades, Spades__factory } from "../typechain-types";
+import { Spades, Spades__factory, SpadesFactory, SpadesFactory__factory } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-
-import { waitForDebugger } from "inspector";
-import { utils } from "mocha";
-
-
-let accounts:   HardhatEthersSigner[];
-let contract: Spades;
-
-const hre = require("hardhat");
 
 async function main() {
     try {
-
-        ///Init accounts
-        accounts = await ethers.getSigners();
+        // Get accounts
+        const accounts = await ethers.getSigners();
         
+        // Deploy the factory first
+        console.log("Deploying SpadesFactory...");
+        const factoryFactory = new SpadesFactory__factory(accounts[0]);
+        const factory = await factoryFactory.deploy();
+        await factory.waitForDeployment();
+        const factoryAddress = await factory.getAddress();
+        console.log(`SpadesFactory deployed at ${factoryAddress}`);
 
-        /// Deploying contract;
-        /// ---------------------
-
-        const contractFactory = new Spades__factory(accounts[0]);
-        const contract = await contractFactory.deploy([accounts[0], accounts[1], accounts[2]], 1, {value: 100});
-        await contract.waitForDeployment();
-        const spadesAddress= await contract.getAddress();
-
-        console.log(`Spades contract deployed at ${spadesAddress} with owners:\n 
-        ${accounts[0].address}\n
-        ${accounts[1].address}\n
-        ${accounts[2].address} \n`); 
-
-        const balance = await ethers.provider.getBalance(spadesAddress);
-        console.log(`Spades contract has ${balance} ethers of balance`); 
+        // Create a new wallet through the factory
+        console.log("Creating new Spades wallet...");
+        const owners = [accounts[0].address, accounts[1].address, accounts[2].address];
+        const requiredSignatures = 2;
         
-        // Submit a transaction
-        // Define 'amount' and 'data' here with appropriate values
-
-        const amountInEther = 4;
-        const weiAmount = ethers.parseEther(amountInEther.toString());
-        const binaryData = new Uint8Array([0x17, 0x60, 0x6c, 0x4c, 0x6f]);
-        //const data = ethers.keccak256(binaryData);
-
-        const tx = await contract.connect(accounts[1]).submit(accounts[2].address, weiAmount, binaryData);
-        const receipt = await tx.wait();
-            
-        console.log(`Submitted transaction from ${accounts[1].address}:\n 
-        With the hash: ${receipt?.hash}\n`);
-
-        // Fetching the submited transaction
-        console.log("Fetching a submited transaction at index (0):\n");
+        const createTx = await factory.createWallet(
+            owners,
+            requiredSignatures
+        );
         
-        const seeTransaction = await contract.getTransaction(0);
-        console.log(`${seeTransaction}`);
-
-        // Signing a transaction 
-        // Index [0] with accounts [0]
-        const signature = contract.signTransaction(0);
-        await signature;
-
-        console.log(`\nAccount with address ${accounts[0].address}
-        signed the tx with index 0\n`);
-
-        // See who already signed tx [0]
-        // Passing address [2] should give false
-        const seeSignatures = await contract.seeIfSigned(0, accounts[2].address);
-        await seeSignatures;
-
-        console.log(`The account ${accounts[2].address} signed this tx: ${seeSignatures}`);
-
-        // Passing address [0] should give true
-        const accountSignature = await contract.seeIfSigned(0, accounts[0].address);
-        await accountSignature;
-
-        console.log(`The account ${accounts[0].address} signed the tx: ${accountSignature}`);
-
-        // Passing address [1] should give true
-        const firstSignature = await contract.seeIfSigned(0, accounts[1].address);
-        await firstSignature;
-
-        console.log(`The account ${accounts[1].address} signed the tx: ${firstSignature}`);
-
-        // Signing with account [2]
-        const signature2 = contract.connect(accounts[2]).signTransaction(0);
-        await signature2;
-
-        console.log(`\nAccount with address ${accounts[2].address}
-        signed the tx with index 0.\n`);
-
-        const seeSignaturesAgain = await contract.seeIfSigned(0, accounts[2].address);
-        await seeSignaturesAgain;
-
-        console.log(`The account ${accounts[2].address} signed this tx: ${seeSignaturesAgain}`);
-    
-
-        // Revoke a confirmation
-        const revokeOwner2 = contract.connect(accounts[2]).revokeConfirmation(0);
-        await (await revokeOwner2).wait();
-
-        const seeSignatures2 = await contract.seeIfSigned(0, accounts[2]);
-
-
-        console.log(`The account ${accounts[2].address} signed this tx: ${seeSignatures2}\n`);
-
-
-        // Working on the contract function to execute;
-
+        const receipt = await createTx.wait();
         
+        if (!receipt) {
+            throw new Error("Transaction failed");
+        }
+
+        // Get the wallet address from the WalletCreated event
+        const walletCreatedEvent = receipt.logs.find(
+            (log) => {
+                try {
+                    return factory.interface.parseLog({
+                        topics: log.topics as string[],
+                        data: log.data
+                    })?.name === "WalletCreated"
+                } catch {
+                    return false;
+                }
+            }
+        );
+
+        if (!walletCreatedEvent) {
+            throw new Error("WalletCreated event not found");
+        }
+
+        const parsedLog = factory.interface.parseLog({
+            topics: walletCreatedEvent.topics as string[],
+            data: walletCreatedEvent.data
+        });
+
+        const walletAddress = parsedLog?.args[0];
+        console.log(`New Spades wallet deployed at ${walletAddress}`);
+        
+        // Get wallet instance
+        const wallet = Spades__factory.connect(walletAddress, accounts[0]);
+        
+        // Send 1 ETH to the wallet
+        console.log("\nSending 1 ETH to wallet...");
+        const fundTx = await accounts[0].sendTransaction({
+            to: walletAddress,
+            value: ethers.parseEther("1.0")
+        });
+        await fundTx.wait();
+        console.log("Funding transaction completed");
+        
+        // Log wallet details
+        console.log("\nWallet Details:");
+        console.log(`Owners: ${owners.join(", ")}`);
+        console.log(`Required signatures: ${requiredSignatures}`);
+        const balance = await ethers.provider.getBalance(walletAddress);
+        console.log(`Initial balance: ${ethers.formatEther(balance)} ETH`);
+
     } catch (error) {
-        console.error("An error occurred:", error);
+        console.error("Deployment failed:", error);
+        process.exit(1);
     }
 }
 
-main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+        console.error(error);
+        process.exit(1);
+    });
