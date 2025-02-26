@@ -28,13 +28,24 @@ contract Spades {
     /// @param _txNonce The transaction identifier
     event transactionExecuted(address _executor, uint _txNonce);
 
+    /// @notice Event emitted when a Schnorr signature is used
+    event SchnorrSignatureUsed(address indexed signer, uint indexed txNonce, bytes32 publicNonce);
+
     /// @notice Structure to store transaction details
     /// @dev Used to keep track of submitted transactions
     struct Transaction {
-        address targetAccount; /// Destination address for the transaction
-        uint amount; /// Amount of ETH to be sent
-        uint confirmations; /// Number of confirmations received
-        bytes data; /// Data to be executed
+        address targetAccount;
+        uint amount;
+        uint confirmations;
+        bytes data;
+        bool executed;
+        uint proposedAt;
+    }
+
+    /// @notice Structure to store signature type and data
+    struct SignatureData {
+        bool isSchnorr;      // true for Schnorr, false for ECDSA
+        bytes signature;      // Raw signature data
     }
 
     /// @notice Structure to store settings details
@@ -53,6 +64,13 @@ contract Spades {
     /// @notice Mapping to check if an address is an owner
     mapping(address => bool) public isOwner;
 
+    /// @notice Mapping to store signature data for each transaction and signer
+    mapping(uint => mapping(address => SignatureData)) public signatures;
+
+    /// @notice Mapping to track used nonces for replay protection
+    mapping(bytes32 => bool) public usedNonces;
+    
+
     /// @notice Current transaction count, used as nonce
     uint public txNonce;
 
@@ -61,6 +79,9 @@ contract Spades {
 
     /// @notice Array of owner addresses
     address[] public owners;
+
+    /// @notice Schnorr verification parameters
+    uint256 constant Q = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
     modifier ownerOnly() {
         require(isOwner[msg.sender], "You don't own this Spade"); // Checks if msg.sender is owner.
@@ -110,7 +131,9 @@ contract Spades {
             targetAccount: _targetAccount,
             amount: _amount,
             confirmations: 1,
-            data: _data
+            data: _data,
+            executed: false,
+            proposedAt: block.timestamp
         });
 
         txMap[txNonce] = transaction;
@@ -120,10 +143,51 @@ contract Spades {
         txNonce++;
     }
 
-    /// @notice Signs a pending transaction
+    /// @notice Signs a transaction with either ECDSA or Schnorr signature
     /// @param _txNonce The transaction ID to sign
-    function signTransaction(uint _txNonce) public ownerOnly txExists(_txNonce) {
+    /// @param _signature The signature data
+    /// @param _isSchnorr Whether this is a Schnorr signature
+    /// @param _publicNonce The public nonce (only required for Schnorr signatures)
+    function signTransaction(
+        uint _txNonce,
+        bytes memory _signature,
+        bool _isSchnorr,
+        bytes32 _publicNonce
+    ) public ownerOnly txExists(_txNonce) {
         require(!whoSignedTx[_txNonce][msg.sender], "Already signed");
+        
+        Transaction storage transaction = txMap[_txNonce];
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                transaction.targetAccount,
+                transaction.amount,
+                transaction.data,
+                _txNonce
+            )
+        );
+
+        if (_isSchnorr) {
+            // Prevent nonce reuse
+            bytes32 nonceHash = keccak256(abi.encodePacked(msg.sender, _publicNonce));
+            require(!usedNonces[nonceHash], "Nonce already used");
+            usedNonces[nonceHash] = true;
+
+            require(verifySchnorr(messageHash, _signature), "Invalid Schnorr signature");
+            emit SchnorrSignatureUsed(msg.sender, _txNonce, _publicNonce);
+        } else {
+            // Traditional ECDSA verification
+            bytes32 ethSignedMessageHash = keccak256(
+                abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+            );
+            address signer = recoverSigner(ethSignedMessageHash, _signature);
+            require(signer == msg.sender, "Invalid ECDSA signature");
+        }
+
+        // Store signature data
+        signatures[_txNonce][msg.sender] = SignatureData({
+            isSchnorr: _isSchnorr,
+            signature: _signature
+        });
 
         whoSignedTx[_txNonce][msg.sender] = true;
         txMap[_txNonce].confirmations += 1;
@@ -148,6 +212,44 @@ contract Spades {
         emit transactionExecuted(msg.sender, _txNonce);
     }
 
+    /// @notice Verifies a Schnorr signature
+    /// @param hash Message hash
+    /// @param sig Encoded signature data (px, e, s, parity)
+    function verifySchnorr(bytes32 hash, bytes memory sig) internal pure returns (bool) {
+        // Decode signature components
+        (bytes32 px, bytes32 e, bytes32 s, uint8 parity) = abi.decode(sig, (bytes32, bytes32, bytes32, uint8));
+        
+        // Calculate sp and ep for ecrecover
+        bytes32 sp = bytes32(Q - mulmod(uint256(s), uint256(px), Q));
+        bytes32 ep = bytes32(Q - mulmod(uint256(e), uint256(px), Q));
+
+        require(uint256(sp) != Q, "Invalid s value");
+        
+        // Recover the address using ecrecover
+        address R = ecrecover(sp, parity, px, ep);
+        require(R != address(0), "ecrecover failed");
+        
+        // Verify the challenge
+        return e == keccak256(abi.encodePacked(R, uint8(parity), px, hash));
+    }
+
+    /// @notice Helper function to recover signer from ECDSA signature
+    function recoverSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
+        require(_signature.length == 65, "Invalid signature length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := mload(add(_signature, 32))
+            s := mload(add(_signature, 64))
+            v := byte(0, mload(add(_signature, 96)))
+        }
+
+        return ecrecover(_hash, v, r, s);
+    }
+
     /// @notice Gets transaction details
     /// @param _txNonce The transaction ID
     /// @return Transaction memory The transaction details
@@ -167,6 +269,28 @@ contract Spades {
         address _signer
     ) public view returns (bool) {
         return whoSignedTx[_txNonce][_signer];
+    }
+
+        /// @notice Gets the signature data for a transaction
+    /// @param _txNonce The transaction ID
+    /// @param _signer The signer address
+    /// @return SignatureData memory The signature data
+    function getSignatureData(
+        uint _txNonce,
+        address _signer
+    ) public view returns (SignatureData memory) {
+        return signatures[_txNonce][_signer];
+    }
+
+    /// @notice Checks if a nonce has been used
+    /// @param _signer The signer address
+    /// @param _publicNonce The public nonce to check
+    /// @return bool True if the nonce has been used
+    function isNonceUsed(
+        address _signer,
+        bytes32 _publicNonce
+    ) public view returns (bool) {
+        return usedNonces[keccak256(abi.encodePacked(_signer, _publicNonce))];
     }
 
     /// @notice Allows the contract to receive ETH
