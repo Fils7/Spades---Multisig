@@ -22,7 +22,7 @@ contract SpadesFactory {
         // Create new proxy
         SpadesProxy proxy = new SpadesProxy{value: msg.value}(singleton);
         
-        // Setup the wallet - fix the conversion
+        // Setup the wallet
         address payable proxyAddress = payable(address(proxy));
         Spades(proxyAddress).setup(_owners, _signaturesRequired);
 

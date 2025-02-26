@@ -24,6 +24,7 @@
     "typescript": "^5.1.6"
   },
   "dependencies": {
+    "@borislav.itskov/schnorrkel.js": "^3.1.1",
     "@openzeppelin/contracts": "^4.9.0",
     "@openzeppelin/contracts-upgradeable": "^4.9.0",
     "viem": "^1.9.5",

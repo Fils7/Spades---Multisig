@@ -1,23 +1,28 @@
 import { ethers } from "hardhat";
-import { Spades, Spades__factory, SpadesFactory, SpadesFactory__factory } from "../typechain-types";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 async function main() {
     try {
-        // Get accounts
-        const accounts = await ethers.getSigners();
-        
-        // Deploy the factory first
-        console.log("Deploying SpadesFactory...");
-        const factoryFactory = new SpadesFactory__factory(accounts[0]);
-        const factory = await factoryFactory.deploy();
+        // 1. Deploy the Spades implementation (singleton)
+        console.log("Deploying Spades implementation...");
+        const Spades = await ethers.getContractFactory("Spades");
+        const implementation = await Spades.deploy();
+        await implementation.waitForDeployment();
+        const implementationAddress = await implementation.getAddress();
+        console.log(`Spades implementation deployed at ${implementationAddress}`);
+
+        // 2. Deploy the factory with implementation address
+        console.log("\nDeploying SpadesFactory...");
+        const Factory = await ethers.getContractFactory("SpadesFactory");
+        // Fix: Pass implementation address as argument array
+        const factory = await Factory.deploy(implementationAddress, {}) as any;
         await factory.waitForDeployment();
         const factoryAddress = await factory.getAddress();
         console.log(`SpadesFactory deployed at ${factoryAddress}`);
 
-        // Create a new wallet through the factory
-        console.log("Creating new Spades wallet...");
-        const owners = [accounts[0].address, accounts[1].address, accounts[2].address];
+        // 3. Create a new wallet through factory (optional example)
+        console.log("\nCreating new Spades wallet...");
+        const [owner1, owner2, owner3] = await ethers.getSigners();
+        const owners = [owner1.address, owner2.address, owner3.address];
         const requiredSignatures = 2;
         
         const createTx = await factory.createWallet(
@@ -27,13 +32,9 @@ async function main() {
         
         const receipt = await createTx.wait();
         
-        if (!receipt) {
-            throw new Error("Transaction failed");
-        }
-
-        // Get the wallet address from the WalletCreated event
-        const walletCreatedEvent = receipt.logs.find(
-            (log) => {
+        // Get wallet address from WalletCreated event
+        const walletCreatedEvent = receipt?.logs.find(
+            (log: any) => {
                 try {
                     return factory.interface.parseLog({
                         topics: log.topics as string[],
@@ -57,20 +58,21 @@ async function main() {
         const walletAddress = parsedLog?.args[0];
         console.log(`New Spades wallet deployed at ${walletAddress}`);
         
-        // Get wallet instance
-        const wallet = Spades__factory.connect(walletAddress, accounts[0]);
-        
-        // Send 1 ETH to the wallet
+        // 4. Fund the wallet (optional)
         console.log("\nSending 1 ETH to wallet...");
-        const fundTx = await accounts[0].sendTransaction({
+        const fundTx = await owner1.sendTransaction({
             to: walletAddress,
             value: ethers.parseEther("1.0")
         });
         await fundTx.wait();
         console.log("Funding transaction completed");
         
-        // Log wallet details
-        console.log("\nWallet Details:");
+        // 5. Log deployment details
+        console.log("\nDeployment Summary:");
+        console.log("--------------------");
+        console.log(`Implementation: ${implementationAddress}`);
+        console.log(`Factory: ${factoryAddress}`);
+        console.log(`Example Wallet: ${walletAddress}`);
         console.log(`Owners: ${owners.join(", ")}`);
         console.log(`Required signatures: ${requiredSignatures}`);
         const balance = await ethers.provider.getBalance(walletAddress);
