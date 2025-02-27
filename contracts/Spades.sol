@@ -62,7 +62,7 @@ contract Spades {
     mapping(uint => mapping(address => bool)) public whoSignedTx;
 
     /// @notice Mapping to check if an address is an owner
-    mapping(address => bool) public isOwner;
+    mapping(address => bool) internal isOwner;
 
     /// @notice Mapping to store signature data for each transaction and signer
     mapping(uint => mapping(address => SignatureData)) public signatures;
@@ -79,6 +79,10 @@ contract Spades {
 
     /// @notice Array of owner addresses
     address[] public owners;
+
+    /// @notice Boolean to check if the contract has been initialized
+    bool private initialized;
+
 
     /// @notice Schnorr verification parameters
     uint256 constant Q = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
@@ -98,6 +102,7 @@ contract Spades {
     /// @param _signaturesRequired Number of required signatures
     /// @dev This can only be called once during proxy setup
     function setup(address[] memory _owners, uint _signaturesRequired) public {
+        require(!initialized, "Already initialized");
         require(_owners.length > 0, "Owners required");
         require(
             _signaturesRequired > 0 && _signaturesRequired <= _owners.length,
@@ -108,11 +113,13 @@ contract Spades {
             address owner = _owners[i];
             require(owner != address(0), "Invalid owner");
             require(!isOwner[owner], "Owner not unique");
+            
             isOwner[owner] = true;
             owners.push(owner);
         }
 
         signaturesRequired = _signaturesRequired;
+        initialized = true;
     }
 
     /// @notice Submits a new transaction for approval
@@ -260,6 +267,11 @@ contract Spades {
         return txMap[_txNonce];
     }
 
+    /// @notice Debug function to check if proxy is working
+    function getImplementationAddress() public view returns (address) {
+        return address(this);
+    }
+
     /// @notice Checks if an owner has signed a transaction
     /// @param _txNonce The transaction ID
     /// @param _signer The address to check
@@ -291,6 +303,16 @@ contract Spades {
         bytes32 _publicNonce
     ) public view returns (bool) {
         return usedNonces[keccak256(abi.encodePacked(_signer, _publicNonce))];
+    }
+
+    /// @notice Get the number of owners
+    function getOwnerCount() public view returns (uint256) {
+        return owners.length;
+    }
+
+    /// @notice Debug function to check initialization
+    function isInitialized() public view returns (bool) {
+        return initialized;
     }
 
     /// @notice Allows the contract to receive ETH
