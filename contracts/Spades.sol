@@ -26,7 +26,7 @@ contract Spades {
     /// @notice Emitted when a transaction is executed
     /// @param _executor The address that executed the transaction
     /// @param _txNonce The transaction identifier
-    event transactionExecuted(address _executor, uint _txNonce);
+    event TransactionExecuted(address _executor, uint _txNonce);
 
     /// @notice Event emitted when a Schnorr signature is used
     event SchnorrSignatureUsed(address indexed signer, uint indexed txNonce, bytes32 publicNonce);
@@ -206,17 +206,20 @@ contract Spades {
     /// @param _txNonce The transaction ID to execute
     function executeTransaction(uint _txNonce) public txExists(_txNonce) {
         Transaction storage transaction = txMap[_txNonce];
+        require(!transaction.executed, "Transaction already executed");
         require(
             transaction.confirmations >= signaturesRequired,
             "Not enough signatures"
         );
 
+        transaction.executed = true;  // Mark as executed before making the call
+        
         (bool success, ) = transaction.targetAccount.call{
             value: transaction.amount
         }(transaction.data);
         require(success, "Transaction failed");
 
-        emit transactionExecuted(msg.sender, _txNonce);
+        emit TransactionExecuted(msg.sender, _txNonce);
     }
 
     /// @notice Verifies a Schnorr signature
