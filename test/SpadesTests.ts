@@ -287,7 +287,7 @@ describe("Spades", function () {
           )
       );
 
-      // Create Schnorr signer and get its address
+      // Create Schnorr signer using the hybrid signer's private key
       const signerOne = new SchnorrSigner((schnorrSigner1 as any)._privateKey);
       
       // Log addresses and balances for debugging
@@ -302,12 +302,16 @@ describe("Spades", function () {
       // Get encoded signature for contract
       const encodedSignature = signerOne.getEcrecoverSignature(signature);
 
-      // Sign the transaction
-      await wallet.connect(schnorrSigner1).signTransaction(
+      // Sign the transaction with explicit gas limit
+      const tx = await wallet.connect(schnorrSigner1).signTransaction.populateTransaction(
           txNonce,
-          encodedSignature,
-          true // isSchnorr
+          encodedSignature
       );
+
+      await schnorrSigner1.sendTransaction({
+          ...tx,
+          gasLimit: 500000
+      });
 
       // Verify it worked
       expect(await wallet.seeIfSigned(txNonce, schnorrSigner1.address)).to.be.true;

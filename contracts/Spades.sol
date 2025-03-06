@@ -181,8 +181,7 @@ contract Spades {
     /// @notice Signs a transaction with Schnorr signature
     function signTransaction(
         uint _txNonce,
-        bytes calldata _signature,
-        bool _isSchnorr
+        bytes calldata _signature
     ) public ownerOnly txExists(_txNonce) {
         require(!whoSignedTx[_txNonce][msg.sender], "Already signed");
         
@@ -200,22 +199,13 @@ contract Spades {
             )
         );
 
-        if (_isSchnorr) {
-            address signer = ecrecoverSchnorr(commitment, _signature);
-            require(signer == msg.sender, "Invalid signer");
-            emit SchnorrSignatureUsed(msg.sender, _txNonce, commitment);
-        } else {
-            // Traditional ECDSA verification
-            bytes32 ethSignedMessageHash = keccak256(
-                abi.encodePacked("\x19Ethereum Signed Message:\n32", commitment)
-            );
-            address signer = recoverSigner(ethSignedMessageHash, _signature);
-            require(signer == msg.sender, "Invalid ECDSA signature");
-        }
+        address signer = ecrecoverSchnorr(commitment, _signature);
+        require(signer == msg.sender, "Invalid signer");
+        emit SchnorrSignatureUsed(msg.sender, _txNonce, commitment);
 
         // Store signature data
         signatures[_txNonce][msg.sender] = SignatureData({
-            isSchnorr: _isSchnorr,
+            isSchnorr: true,
             signature: _signature
         });
 
