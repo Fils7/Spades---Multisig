@@ -150,41 +150,64 @@ contract Spades {
         txNonce++;
     }
 
-    /// @notice Signs a transaction with either ECDSA or Schnorr signature
-    /// @param _txNonce The transaction ID to sign
-    /// @param _signature The signature data
-    /// @param _isSchnorr Whether this is a Schnorr signature
-    /// @param _publicNonce The public nonce (only required for Schnorr signatures)
+    /// @notice Verifies a Schnorr signature following Safe's approach
+    /// @param commitment Message hash
+    /// @param signature Encoded signature data (px, e, s, parity)
+    function ecrecoverSchnorr(
+        bytes32 commitment,
+        bytes calldata signature
+    ) public pure returns (address) {
+        (bytes32 px, bytes32 e, bytes32 s, uint8 parity) = abi.decode(
+            signature,
+            (bytes32, bytes32, bytes32, uint8)
+        );
+
+        bytes32 sp = bytes32(Q - mulmod(uint256(s), uint256(px), Q));
+        bytes32 ep = bytes32(Q - mulmod(uint256(e), uint256(px), Q));
+
+        require(sp != bytes32(Q), "Invalid s value");
+        
+        address R = ecrecover(sp, parity, px, ep);
+        require(R != address(0), "ecrecover failed");
+        
+        require(
+            e == keccak256(abi.encodePacked(R, uint8(parity), px, commitment)),
+            "Invalid Schnorr signature"
+        );
+        
+        return address(uint160(uint256(px)));
+    }
+
+    /// @notice Signs a transaction with Schnorr signature
     function signTransaction(
         uint _txNonce,
-        bytes memory _signature,
-        bool _isSchnorr,
-        bytes32 _publicNonce
+        bytes calldata _signature,
+        bool _isSchnorr
     ) public ownerOnly txExists(_txNonce) {
         require(!whoSignedTx[_txNonce][msg.sender], "Already signed");
         
         Transaction storage transaction = txMap[_txNonce];
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
+
+        // Create commitment hash including chainId and nonce for replay protection
+        bytes32 commitment = keccak256(
+            abi.encode(
+                address(this),
+                block.chainid,
+                _txNonce,
                 transaction.targetAccount,
                 transaction.amount,
-                transaction.data,
-                _txNonce
+                transaction.data
             )
         );
 
         if (_isSchnorr) {
-            // Prevent nonce reuse
-            bytes32 nonceHash = keccak256(abi.encodePacked(msg.sender, _publicNonce));
-            require(!usedNonces[nonceHash], "Nonce already used");
-            usedNonces[nonceHash] = true;
-
-            require(verifySchnorr(messageHash, _signature), "Invalid Schnorr signature");
-            emit SchnorrSignatureUsed(msg.sender, _txNonce, _publicNonce);
+            address signer = ecrecoverSchnorr(commitment, _signature);
+            require(signer == msg.sender, "Invalid signer");
+            emit SchnorrSignatureUsed(msg.sender, _txNonce, commitment);
         } else {
             // Traditional ECDSA verification
             bytes32 ethSignedMessageHash = keccak256(
-                abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+                abi.encodePacked("\x19Ethereum Signed Message:\n32", commitment)
             );
             address signer = recoverSigner(ethSignedMessageHash, _signature);
             require(signer == msg.sender, "Invalid ECDSA signature");
@@ -220,27 +243,6 @@ contract Spades {
         require(success, "Transaction failed");
 
         emit TransactionExecuted(msg.sender, _txNonce);
-    }
-
-    /// @notice Verifies a Schnorr signature
-    /// @param hash Message hash
-    /// @param sig Encoded signature data (px, e, s, parity)
-    function verifySchnorr(bytes32 hash, bytes memory sig) internal pure returns (bool) {
-        // Decode signature components
-        (bytes32 px, bytes32 e, bytes32 s, uint8 parity) = abi.decode(sig, (bytes32, bytes32, bytes32, uint8));
-        
-        // Calculate sp and ep for ecrecover
-        bytes32 sp = bytes32(Q - mulmod(uint256(s), uint256(px), Q));
-        bytes32 ep = bytes32(Q - mulmod(uint256(e), uint256(px), Q));
-
-        require(uint256(sp) != Q, "Invalid s value");
-        
-        // Recover the address using ecrecover
-        address R = ecrecover(sp, parity, px, ep);
-        require(R != address(0), "ecrecover failed");
-        
-        // Verify the challenge
-        return e == keccak256(abi.encodePacked(R, uint8(parity), px, hash));
     }
 
     /// @notice Helper function to recover signer from ECDSA signature
